@@ -1,0 +1,36 @@
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor settings
+.vscode/
+.idea/
+*.code-workspace
+*.iml
+
+# Lua / LÖVE
+*.luac
+*.love
+
+# Build outputs and binaries
+/build/
+/dist/
+/release/
+/tmp/
+/bin/
+/obj/
+*.exe
+*.app
+*.apk
+*.ipa
+*.dylib
+*.dll
+*.so
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
