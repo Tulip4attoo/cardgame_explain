@@ -161,21 +161,67 @@ Return value:
 
 # Flow Tổng Thể: Từ Definition → Scoring
 
-  1. Game Start
-     └─ load P_CENTERS, P_CARDS vào memory
+1. Game Start
+    └─ load P_CENTERS, P_CARDS vào memory
 
-  2. Create Card
-     └─ create_card("Joker") hoặc create_playing_card()
-     └─ Card:init() → Card:set_ability() → copy ability từ P_CENTERS
+2. Create Card
+    └─ create_card("Joker") hoặc create_playing_card()
+    └─ Card:init() → Card:set_ability() → copy ability từ P_CENTERS
 
-  3. Card vào CardArea
-     └─ CardArea:emplace(card) → thêm vào G.jokers / G.hand / etc.
+3. Card vào CardArea
+    └─ CardArea:emplace(card) → thêm vào G.jokers / G.hand / etc.
 
-  4. Player chơi bài
-     └─ evaluate_play() (state_events.lua)
-         ├─ get_poker_hand_info() → xác định hand type
-         ├─ Loop: eval_card() cho từng scoring card
-         ├─ Loop: eval_card() cho từng joker
-         │       └─ Card:calculate_joker(context)
-         │           └─ If-else chain → return {mult, chips, ...}
-         └─ Tổng hợp score → G.GAME.chips
+4. Player chơi bài
+    └─ evaluate_play() (state_events.lua)
+        ├─ get_poker_hand_info() → xác định hand type
+        ├─ Loop: eval_card() cho từng scoring card
+        ├─ Loop: eval_card() cho từng joker
+        │       └─ Card:calculate_joker(context)
+        │           └─ If-else chain → return {mult, chips, ...}
+        └─ Tổng hợp score → G.GAME.chips
+
+Chú ý là cái logic và flow ở mục 4 đã rất là rõ ràng và tường minh. Điều này vô cùng quan trọng để tránh đi các vấn đề về loop hay lỗi logic khi xử lý score, trigger joker khi tính toán.
+
+# Hệ thống được thiết kế đơn giản nhưng hiệu quả
+
+1. Data-driven: Mọi card được định nghĩa trong P_CENTERS/P_CARDS
+2. Definition + Instance: Template bất biến + state có thể thay đổi
+3. Context-based evaluation: Joker effects trigger dựa trên game context
+4. God function: Tất cả joker logic nằm trong calculate_joker() ~1,770 dòng
+5. CardArea containers: Quản lý nhóm card theo chức năng
+
+Chúng ta sẽ chú ý, ở đây, Balatro hoàn toàn không dùng pattern kiểu Components over Inheritance (nói chung là không dùng cả Inheritance và Components) trong việc tạo và kiểm soát Joker.
+
+Cái mà joker "trả về" khi trigger chỉ là:
+
+```lua
+return {
+    mult_mod = 4,        -- +mult
+    Xmult_mod = 1.5,     -- xmult
+    chip_mod = 30,        -- +chips
+    h_dollars = 3,        -- +tiền
+    message = "+4 Mult",  -- hiển thị UI
+}
+```
+
+Đó chỉ là 1 table (dạng dạng dictionary trong python). Không có lớp lang, các attributes gì phức tạp, không có behavior, không có lifecycle, không có component nào attach vào card.
+
+So sánh 1 cách đơn giản
+
+**Component pattern** (kiểu Unity/ECS):
+```
+Card
+  ├── MultModifier component (+4 mult)
+  ├── TriggerCondition component (on_discard, on_score...)
+  ├── SelfDestruct component (khi hết charges)
+  └── Animation component
+```
+
+**Balatro thực tế:**
+```
+Card
+  └── ability table (mấy con số)
+      └── calculate_joker() check tên → trả về mấy con số
+```
+
+Mọi joker dù phức tạp đến đâu, cuối cùng vẫn quy về **một thời điểm, trả về một table số**, rồi `evaluate_play()` cộng/nhân vào score. Không có component nào attach vào card, không có system nào tick qua component.
